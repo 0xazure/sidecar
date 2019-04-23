@@ -46,6 +46,7 @@ impl Config {
 enum XmlTag {
     Post,
     Tag,
+    Photo,
     PhotoUrl,
     Other,
 }
@@ -55,6 +56,7 @@ struct Post {
     id: String,
     extension: Option<String>,
     tags: Vec<String>,
+    image_count: u8,
 }
 
 pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
@@ -89,6 +91,10 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
                 }
                 "tag" => last_opened_tag = XmlTag::Tag,
                 "photo-url" => last_opened_tag = XmlTag::PhotoUrl,
+                "photo" => {
+                    last_opened_tag = XmlTag::Photo;
+                    post.image_count += 1;
+                }
                 _ => last_opened_tag = XmlTag::Other,
             },
             Ok(XmlEvent::EndElement { name, .. }) => match name.local_name.as_str() {
@@ -119,13 +125,27 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
         if post.extension.is_some() {
             let mut path = PathBuf::new();
             path.push(config.media_dir.clone());
-            path.push(post.id);
-            path.set_extension(format!("{}.txt", post.extension.unwrap()));
 
-            let mut tags_file = File::create(path)?;
-
+            let mut buff = Vec::new();
             for tag in post.tags {
-                writeln!(&mut tags_file, "{}", tag)?
+                writeln!(&mut buff, "{}", tag)?;
+            }
+
+            if post.image_count == 0 {
+                path.push(post.id);
+                path.set_extension(format!("{}.txt", post.extension.unwrap()));
+
+                let mut tags_file = File::create(path)?;
+                tags_file.write(&buff)?;
+            } else {
+                for i in 0..post.image_count {
+                    let mut photo_path = path.clone();
+                    photo_path.push(format!("{}_{}", post.id, i));
+                    photo_path.set_extension(format!("{}.txt", post.extension.clone().unwrap()));
+
+                    let mut tags_file = File::create(photo_path)?;
+                    tags_file.write(&buff)?;
+                }
             }
         }
     }
