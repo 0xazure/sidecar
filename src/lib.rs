@@ -115,6 +115,8 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
         };
     }
 
+    posts.retain(|p| p.extension.is_some());
+
     for post in posts {
         println!("{:?}", post);
     }
