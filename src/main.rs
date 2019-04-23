@@ -1,6 +1,6 @@
 use sidecar::Config;
-use structopt::StructOpt;
 use std::process;
+use structopt::StructOpt;
 
 fn main() {
     let config = Config::from_args();
