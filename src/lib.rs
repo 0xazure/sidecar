@@ -1,6 +1,6 @@
 use std::error;
 use std::fs::File;
-use std::io::{self, BufReader};
+use std::io::{self, BufReader, Write};
 use std::path::PathBuf;
 use structopt::StructOpt;
 use xml::reader::{EventReader, XmlEvent};
@@ -115,10 +115,19 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
         };
     }
 
-    posts.retain(|p| p.extension.is_some());
-
     for post in posts {
-        println!("{:?}", post);
+        if post.extension.is_some() {
+            let mut path = PathBuf::new();
+            path.push(config.media_dir.clone());
+            path.push(post.id);
+            path.set_extension(format!("{}.txt", post.extension.unwrap()));
+
+            let mut tags_file = File::create(path)?;
+
+            for tag in post.tags {
+                writeln!(&mut tags_file, "{}", tag)?
+            }
+        }
     }
 
     Ok(())
