@@ -127,7 +127,7 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
             path.push(config.media_dir.clone());
 
             let mut buff = Vec::new();
-            for tag in post.tags {
+            for tag in &post.tags {
                 writeln!(&mut buff, "{}", tag)?;
             }
 
