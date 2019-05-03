@@ -10,35 +10,44 @@ use xml::reader::{EventReader, XmlEvent};
     name = "sidecar",
     about = "Generate sidecar files from Tumblr posts.xml files"
 )]
-pub struct Config {
-    #[structopt(
-        name = "posts.xml",
-        short = "p",
-        long = "posts",
-        default_value = "posts.xml"
-    )]
-    posts_file: PathBuf,
-    #[structopt(name = "media/", short = "m", long = "media", default_value = "media/")]
-    media_dir: PathBuf,
+pub enum Config {
+    #[structopt(name = "generate", visible_alias = "gen")]
+    Generate {
+        #[structopt(
+            name = "posts.xml",
+            short = "p",
+            long = "posts",
+            default_value = "posts.xml"
+        )]
+        posts_file: PathBuf,
+        #[structopt(name = "media/", short = "m", long = "media", default_value = "media/")]
+        media_dir: PathBuf,
+    },
 }
 
 impl Config {
     fn exists(&self) -> Result<(), io::Error> {
-        if !self.posts_file.exists() {
-            return Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                format!("No such file or directory {}", self.posts_file.display()),
-            ));
-        }
+        match self {
+            Config::Generate {
+                posts_file,
+                media_dir,
+            } => {
+                if !posts_file.exists() {
+                    return Err(io::Error::new(
+                        io::ErrorKind::NotFound,
+                        format!("No such file or directory {}", posts_file.display()),
+                    ));
+                }
 
-        if !self.media_dir.exists() {
-            return Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                format!("No such file or directory {}", self.media_dir.display()),
-            ));
+                if !media_dir.exists() {
+                    return Err(io::Error::new(
+                        io::ErrorKind::NotFound,
+                        format!("No such file or directory {}", media_dir.display()),
+                    ));
+                }
+                Ok(())
+            }
         }
-
-        Ok(())
     }
 }
 
@@ -62,9 +71,15 @@ struct Post {
 pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
     config.exists()?;
 
-    let posts = parse_posts(config.posts_file)?;
-
-    generate_sidecar_files(&posts, config.media_dir)?;
+    match config {
+        Config::Generate {
+            posts_file,
+            media_dir,
+        } => {
+            let posts = parse_posts(posts_file)?;
+            generate_sidecar_files(&posts, media_dir)?;
+        }
+    };
 
     Ok(())
 }
