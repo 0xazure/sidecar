@@ -34,7 +34,7 @@ impl Config {
         if !self.media_dir.exists() {
             return Err(io::Error::new(
                 io::ErrorKind::NotFound,
-                format!("No such file or directory {}", self.posts_file.display()),
+                format!("No such file or directory {}", self.media_dir.display()),
             ));
         }
 
