@@ -111,7 +111,7 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
     Ok(())
 }
 
-fn parse_posts<P: AsRef<Path>>(posts_file: P) -> Result<Vec<Post>, Box<dyn error::Error>> {
+fn parse_posts<P: AsRef<Path>>(posts_file: P) -> Result<Vec<Post>, xml::reader::Error> {
     let file = File::open(posts_file.as_ref())?;
     let file = BufReader::new(file);
     let parser = EventReader::new(file);
@@ -123,7 +123,7 @@ fn parse_posts<P: AsRef<Path>>(posts_file: P) -> Result<Vec<Post>, Box<dyn error
 
     for event in parser {
         match event {
-            Err(e) => return Err(Box::new(e)),
+            Err(e) => return Err(e),
             Ok(XmlEvent::StartElement {
                 name, attributes, ..
             }) => match name.local_name.as_str() {
@@ -132,10 +132,11 @@ fn parse_posts<P: AsRef<Path>>(posts_file: P) -> Result<Vec<Post>, Box<dyn error
                     post.id = match attributes.iter().find(|a| a.name.local_name == "id") {
                         Some(id) => id.value.clone(),
                         None => {
-                            return Err(Box::new(io::Error::new(
+                            return Err(io::Error::new(
                                 io::ErrorKind::InvalidData,
                                 "Post missing required attribute 'id'",
-                            )))
+                            )
+                            .into())
                         }
                     }
                 }
@@ -177,7 +178,7 @@ fn parse_posts<P: AsRef<Path>>(posts_file: P) -> Result<Vec<Post>, Box<dyn error
 fn generate_sidecar_files<P: AsRef<Path>>(
     posts: &Vec<Post>,
     media_dir: P,
-) -> Result<(), Box<dyn error::Error>> {
+) -> Result<(), io::Error> {
     for post in posts {
         if post.extension.is_some() {
             let mut path = PathBuf::new();
