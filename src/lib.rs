@@ -1,9 +1,12 @@
+use counter::Counter;
 use std::error;
 use std::fs::File;
 use std::io::{self, BufReader, Write};
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 use xml::reader::{EventReader, XmlEvent};
+
+mod counter;
 
 #[derive(StructOpt, Debug)]
 #[structopt(
@@ -22,6 +25,11 @@ pub enum Config {
         posts_file: PathBuf,
         #[structopt(name = "media/", short = "m", long = "media", default_value = "media/")]
         media_dir: PathBuf,
+    },
+    #[structopt(name = "analyze", alias = "analyse")]
+    Analyze {
+        #[structopt(name = "posts.xml", default_value = "posts.xml")]
+        posts_file: PathBuf,
     },
 }
 
@@ -45,9 +53,18 @@ impl Config {
                         format!("No such file or directory {}", media_dir.display()),
                     ));
                 }
-                Ok(())
+            }
+            Config::Analyze { posts_file } => {
+                if !posts_file.exists() {
+                    return Err(io::Error::new(
+                        io::ErrorKind::NotFound,
+                        format!("No such file or directory {}", posts_file.display()),
+                    ));
+                }
             }
         }
+
+        Ok(())
     }
 }
 
@@ -78,6 +95,16 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
         } => {
             let posts = parse_posts(posts_file)?;
             generate_sidecar_files(&posts, media_dir)?;
+        }
+        Config::Analyze { posts_file } => {
+            let posts = parse_posts(posts_file)?;
+            let mut tag_counts = count_tags(&posts);
+
+            tag_counts.sort_by(|a, b| b.1.cmp(&a.1));
+
+            for (tag, count) in &tag_counts {
+                println!("{}: {}", tag, count);
+            }
         }
     };
 
@@ -181,4 +208,16 @@ fn generate_sidecar_files<P: AsRef<Path>>(
     }
 
     Ok(())
+}
+
+fn count_tags(posts: &Vec<Post>) -> Vec<(String, u32)> {
+    let mut counter = Counter::new();
+
+    for post in posts {
+        for tag in &post.tags {
+            counter.increment(tag.clone());
+        }
+    }
+
+    counter.into()
 }
