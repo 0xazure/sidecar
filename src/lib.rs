@@ -1,7 +1,7 @@
 use std::error;
 use std::fs::File;
 use std::io::{self, BufReader, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 use xml::reader::{EventReader, XmlEvent};
 
@@ -62,7 +62,15 @@ struct Post {
 pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
     config.exists()?;
 
-    let file = File::open(config.posts_file)?;
+    let posts = parse_posts(config.posts_file)?;
+
+    generate_sidecar_files(&posts, config.media_dir)?;
+
+    Ok(())
+}
+
+fn parse_posts<P: AsRef<Path>>(posts_file: P) -> Result<Vec<Post>, Box<dyn error::Error>> {
+    let file = File::open(posts_file.as_ref())?;
     let file = BufReader::new(file);
     let parser = EventReader::new(file);
 
@@ -121,10 +129,17 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
         };
     }
 
+    Ok(posts)
+}
+
+fn generate_sidecar_files<P: AsRef<Path>>(
+    posts: &Vec<Post>,
+    media_dir: P,
+) -> Result<(), Box<dyn error::Error>> {
     for post in posts {
         if post.extension.is_some() {
             let mut path = PathBuf::new();
-            path.push(config.media_dir.clone());
+            path.push(media_dir.as_ref().clone());
 
             let mut buff = Vec::new();
             for tag in &post.tags {
@@ -132,8 +147,8 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
             }
 
             if post.image_count == 0 {
-                path.push(post.id);
-                path.set_extension(format!("{}.txt", post.extension.unwrap()));
+                path.push(&post.id);
+                path.set_extension(format!("{}.txt", post.extension.as_ref().unwrap()));
 
                 let mut tags_file = File::create(path)?;
                 tags_file.write(&buff)?;
