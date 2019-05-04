@@ -1,12 +1,12 @@
 use counter::Counter;
 use std::error;
 use std::fs::File;
-use std::io::{self, BufReader, Write};
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
-use xml::reader::{EventReader, XmlEvent};
 
 mod counter;
+mod parser;
 
 #[derive(StructOpt, Debug)]
 #[structopt(
@@ -68,17 +68,8 @@ impl Config {
     }
 }
 
-#[derive(PartialEq)]
-enum XmlTag {
-    Post,
-    Tag,
-    Photo,
-    PhotoUrl,
-    Other,
-}
-
 #[derive(PartialEq, Debug, Default)]
-struct Post {
+pub struct Post {
     id: String,
     extension: Option<String>,
     tags: Vec<String>,
@@ -93,11 +84,11 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
             posts_file,
             media_dir,
         } => {
-            let posts = parse_posts(posts_file)?;
+            let posts = parser::parse_posts(posts_file)?;
             generate_sidecar_files(&posts, media_dir)?;
         }
         Config::Analyze { posts_file } => {
-            let posts = parse_posts(posts_file)?;
+            let posts = parser::parse_posts(posts_file)?;
             let mut tag_counts = count_tags(&posts);
 
             tag_counts.sort_by(|a, b| b.1.cmp(&a.1));
@@ -109,70 +100,6 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
     };
 
     Ok(())
-}
-
-fn parse_posts<P: AsRef<Path>>(posts_file: P) -> Result<Vec<Post>, xml::reader::Error> {
-    let file = File::open(posts_file.as_ref())?;
-    let file = BufReader::new(file);
-    let parser = EventReader::new(file);
-
-    let mut posts: Vec<Post> = Vec::new();
-
-    let mut post: Post = Default::default();
-    let mut last_opened_tag = XmlTag::Other;
-
-    for event in parser {
-        match event {
-            Err(e) => return Err(e),
-            Ok(XmlEvent::StartElement {
-                name, attributes, ..
-            }) => match name.local_name.as_str() {
-                "post" => {
-                    last_opened_tag = XmlTag::Post;
-                    post.id = match attributes.iter().find(|a| a.name.local_name == "id") {
-                        Some(id) => id.value.clone(),
-                        None => {
-                            return Err(io::Error::new(
-                                io::ErrorKind::InvalidData,
-                                "Post missing required attribute 'id'",
-                            )
-                            .into())
-                        }
-                    }
-                }
-                "tag" => last_opened_tag = XmlTag::Tag,
-                "photo-url" => last_opened_tag = XmlTag::PhotoUrl,
-                "photo" => {
-                    last_opened_tag = XmlTag::Photo;
-                    post.image_count += 1;
-                }
-                _ => last_opened_tag = XmlTag::Other,
-            },
-            Ok(XmlEvent::EndElement { name, .. }) => match name.local_name.as_str() {
-                "post" => {
-                    posts.push(post);
-                    post = Default::default();
-                }
-                _ => {}
-            },
-            Ok(XmlEvent::Characters(chars)) => match last_opened_tag {
-                XmlTag::Tag => post.tags.push(chars),
-                XmlTag::PhotoUrl => {
-                    let mut iter = chars.rsplitn(2, '.');
-                    let after = iter.next();
-                    let before = iter.next();
-
-                    if before.is_some() {
-                        post.extension = after.map(String::from);
-                    }
-                }
-                _ => {}
-            },
-            _ => {}
-        };
-    }
-
-    Ok(posts)
 }
 
 fn generate_sidecar_files<P: AsRef<Path>>(
