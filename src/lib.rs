@@ -102,14 +102,11 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
     Ok(())
 }
 
-fn generate_sidecar_files<P: AsRef<Path>>(
-    posts: &Vec<Post>,
-    media_dir: P,
-) -> Result<(), io::Error> {
+fn generate_sidecar_files<P: AsRef<Path>>(posts: &[Post], media_dir: P) -> Result<(), io::Error> {
     for post in posts {
         if post.extension.is_some() {
             let mut path = PathBuf::new();
-            path.push(media_dir.as_ref().clone());
+            path.push(media_dir.as_ref());
 
             let mut buff = Vec::new();
             for tag in &post.tags {
@@ -121,7 +118,7 @@ fn generate_sidecar_files<P: AsRef<Path>>(
                 path.set_extension(format!("{}.txt", post.extension.as_ref().unwrap()));
 
                 let mut tags_file = File::create(path)?;
-                tags_file.write(&buff)?;
+                tags_file.write_all(&buff)?;
             } else {
                 for i in 0..post.image_count {
                     let mut photo_path = path.clone();
@@ -129,7 +126,7 @@ fn generate_sidecar_files<P: AsRef<Path>>(
                     photo_path.set_extension(format!("{}.txt", post.extension.clone().unwrap()));
 
                     let mut tags_file = File::create(photo_path)?;
-                    tags_file.write(&buff)?;
+                    tags_file.write_all(&buff)?;
                 }
             }
         }
@@ -138,7 +135,7 @@ fn generate_sidecar_files<P: AsRef<Path>>(
     Ok(())
 }
 
-fn count_tags(posts: &Vec<Post>) -> Vec<TagCount<&str>> {
+fn count_tags(posts: &[Post]) -> Vec<TagCount<&str>> {
     let mut counter: Counter = Default::default();
 
     for post in posts {

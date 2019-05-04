@@ -50,12 +50,11 @@ pub fn parse_posts<P: AsRef<Path>>(posts_file: P) -> Result<Vec<Post>, xml::read
                 }
                 _ => last_opened_tag = XmlTag::Other,
             },
-            Ok(XmlEvent::EndElement { name, .. }) => match name.local_name.as_str() {
-                "post" => {
+            Ok(XmlEvent::EndElement { name, .. }) => {
+                if name.local_name.as_str() == "post" {
                     posts.push(post);
                     post = Default::default();
                 }
-                _ => {}
             },
             Ok(XmlEvent::Characters(chars)) => match last_opened_tag {
                 XmlTag::Tag => post.tags.push(chars),
