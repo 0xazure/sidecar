@@ -1,4 +1,4 @@
-use counter::Counter;
+use counter::{Counter, TagCount};
 use std::error;
 use std::fs::File;
 use std::io::{self, Write};
@@ -91,10 +91,10 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
             let posts = parser::parse_posts(posts_file)?;
             let mut tag_counts = count_tags(&posts);
 
-            tag_counts.sort_by(|a, b| b.1.cmp(&a.1));
+            tag_counts.sort();
 
-            for (tag, count) in &tag_counts {
-                println!("{}: {}", tag, count);
+            for t in &tag_counts {
+                println!("{}", t);
             }
         }
     };
@@ -138,12 +138,12 @@ fn generate_sidecar_files<P: AsRef<Path>>(
     Ok(())
 }
 
-fn count_tags(posts: &Vec<Post>) -> Vec<(String, u32)> {
+fn count_tags(posts: &Vec<Post>) -> Vec<TagCount<&str>> {
     let mut counter = Counter::new();
 
     for post in posts {
         for tag in &post.tags {
-            counter.increment(tag.clone());
+            counter.increment(tag);
         }
     }
 
