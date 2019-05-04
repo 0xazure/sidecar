@@ -107,7 +107,7 @@ fn generate_sidecar_files<P: AsRef<Path>>(posts: &[Post], media_dir: P) -> Resul
         let mut path = PathBuf::new();
         path.push(media_dir.as_ref());
 
-        let mut buff = Vec::new();
+        let mut buff = Vec::with_capacity(post.tags.iter().fold(0, |a, t| a + t.len() + 1));
         for tag in &post.tags {
             writeln!(&mut buff, "{}", tag)?;
         }
