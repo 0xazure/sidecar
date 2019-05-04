@@ -68,7 +68,7 @@ impl Config {
     }
 }
 
-#[derive(PartialEq, Debug, Default)]
+#[derive(Debug, Default)]
 pub struct Post {
     id: String,
     extension: Option<String>,
