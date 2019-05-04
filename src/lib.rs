@@ -139,7 +139,7 @@ fn generate_sidecar_files<P: AsRef<Path>>(
 }
 
 fn count_tags(posts: &Vec<Post>) -> Vec<TagCount<&str>> {
-    let mut counter = Counter::new();
+    let mut counter: Counter = Default::default();
 
     for post in posts {
         for tag in &post.tags {

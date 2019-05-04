@@ -36,18 +36,12 @@ impl<T: Eq + Ord + AsRef<str> + fmt::Display> fmt::Display for TagCount<T> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Default, Debug)]
 pub struct Counter<'a> {
     map: HashMap<&'a str, u32>,
 }
 
 impl<'a> Counter<'a> {
-    pub fn new() -> Counter<'a> {
-        Counter {
-            map: HashMap::new(),
-        }
-    }
-
     pub fn increment(&mut self, key: &'a str) {
         self.map.entry(key).and_modify(|e| *e += 1).or_insert(1);
     }
@@ -73,7 +67,7 @@ mod tests {
 
     #[test]
     fn new_key_counted_once() {
-        let mut counter = Counter::new();
+        let mut counter: Counter = Default::default();
         counter.increment("sidecar");
 
         assert_eq!(counter.get("sidecar").unwrap(), &1);
@@ -81,7 +75,7 @@ mod tests {
 
     #[test]
     fn existing_key_incremented_once() {
-        let mut counter = Counter::new();
+        let mut counter: Counter = Default::default();
         counter.increment("sidecar");
         counter.increment("sidecar");
 
@@ -90,7 +84,7 @@ mod tests {
 
     #[test]
     fn from_counter_for_vec() {
-        let mut counter = Counter::new();
+        let mut counter: Counter = Default::default();
         counter.increment("sidecar");
         let counts: Vec<TagCount<&str>> = counter.into();
 
