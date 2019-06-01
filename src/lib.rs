@@ -112,21 +112,19 @@ fn generate_sidecar_files<P: AsRef<Path>>(posts: &[Post], media_dir: P) -> Resul
             writeln!(&mut buff, "{}", tag)?;
         }
 
-        if post.image_count == 0 {
-            path.push(&post.id);
-            path.set_extension(format!("{}.txt", post.extension.as_ref().unwrap()));
+        for i in 0..=post.image_count {
+            let mut photo_path = path.clone();
 
-            let mut tags_file = File::create(path)?;
-            tags_file.write_all(&buff)?;
-        } else {
-            for i in 0..post.image_count {
-                let mut photo_path = path.clone();
+            if post.image_count > 0 {
                 photo_path.push(format!("{}_{}", post.id, i));
-                photo_path.set_extension(format!("{}.txt", post.extension.clone().unwrap()));
-
-                let mut tags_file = File::create(photo_path)?;
-                tags_file.write_all(&buff)?;
+            } else {
+                photo_path.push(&post.id);
             }
+
+            photo_path.set_extension(format!("{}.txt", post.extension.as_ref().unwrap()));
+
+            let mut tags_file = File::create(photo_path)?;
+            tags_file.write_all(&buff)?;
         }
     }
 
