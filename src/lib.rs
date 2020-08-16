@@ -85,7 +85,7 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
             media_dir,
         } => {
             let posts = parser::parse_posts(posts_file)?;
-            generate_sidecar_files(&posts, media_dir)?;
+            write_sidecar_files(&posts, media_dir)?;
         }
         Config::Analyze { posts_file } => {
             let posts = parser::parse_posts(posts_file)?;
@@ -102,7 +102,7 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
     Ok(())
 }
 
-fn generate_sidecar_files<P: AsRef<Path>>(posts: &[Post], media_dir: P) -> Result<(), io::Error> {
+fn write_sidecar_files<P: AsRef<Path>>(posts: &[Post], media_dir: P) -> Result<(), io::Error> {
     for post in posts {
         let mut path = PathBuf::new();
         path.push(media_dir.as_ref());
@@ -112,21 +112,49 @@ fn generate_sidecar_files<P: AsRef<Path>>(posts: &[Post], media_dir: P) -> Resul
             writeln!(&mut buff, "{}", tag)?;
         }
 
-        for i in 0..=post.image_count {
-            let mut photo_path = path.clone();
-
-            if post.image_count > 0 {
-                photo_path.push(format!("{}_{}", post.id, i));
-            } else {
-                photo_path.push(&post.id);
+        if post.image_count > 0 {
+            for i in 0..post.image_count {
+                write_sidecar_file(
+                    path.clone(),
+                    post.id.clone(),
+                    Some(i),
+                    post.extension.as_ref().unwrap(),
+                    &buff,
+                )?;
             }
-
-            photo_path.set_extension(format!("{}.txt", post.extension.as_ref().unwrap()));
-
-            let mut tags_file = File::create(photo_path)?;
-            tags_file.write_all(&buff)?;
+        } else {
+            write_sidecar_file(
+                path.clone(),
+                post.id.clone(),
+                None,
+                post.extension.as_ref().unwrap(),
+                &buff,
+            )?;
         }
     }
+
+    Ok(())
+}
+
+fn write_sidecar_file<E: AsRef<str>>(
+    output_dir: PathBuf,
+    image_id: String,
+    image_offset: Option<u8>,
+    extension: E,
+    tags: &[u8],
+) -> Result<(), io::Error> {
+    let mut file_path = output_dir;
+    let mut filename = image_id;
+
+    if image_offset.is_some() {
+        filename += &format!("_{}", image_offset.unwrap());
+    }
+
+    file_path.push(filename);
+    file_path.set_extension(format!("{}.txt", extension.as_ref()));
+
+    let mut tags_file = File::create(file_path)?;
+    tags_file.write_all(&tags)?;
 
     Ok(())
 }
