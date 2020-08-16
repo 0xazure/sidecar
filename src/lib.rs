@@ -14,7 +14,7 @@ mod parser;
     about = "Generate sidecar files from Tumblr posts.xml files"
 )]
 pub enum Config {
-    #[structopt(name = "generate", visible_alias = "gen")]
+    #[structopt(name = "generate")]
     Generate {
         #[structopt(
             name = "posts.xml",
@@ -26,7 +26,7 @@ pub enum Config {
         #[structopt(name = "media/", short = "m", long = "media", default_value = "media/")]
         media_dir: PathBuf,
     },
-    #[structopt(name = "analyze", alias = "analyse")]
+    #[structopt(name = "analyze")]
     Analyze {
         #[structopt(name = "posts.xml", default_value = "posts.xml")]
         posts_file: PathBuf,

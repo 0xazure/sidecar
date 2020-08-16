@@ -5,5 +5,5 @@ authors = ["0xazure <stuart.crust@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-structopt = "0.2.15"
+structopt = "0.3.16"
 xml-rs = "0.8.3"
