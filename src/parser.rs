@@ -61,12 +61,14 @@ pub fn parse_posts<P: AsRef<Path>>(posts_file: P) -> Result<Vec<Post>, xml::read
             Ok(XmlEvent::Characters(chars)) => match last_opened_tag {
                 XmlTag::Tag => post.tags.push(chars),
                 XmlTag::PhotoUrl => {
-                    let mut iter = chars.rsplitn(2, '.');
-                    let after = iter.next();
-                    let before = iter.next();
+                    if post.extension.is_none() {
+                        let mut iter = chars.rsplitn(2, '.');
+                        let after = iter.next();
+                        let before = iter.next();
 
-                    if before.is_some() {
-                        post.extension = after.map(String::from);
+                        if before.is_some() {
+                            post.extension = after.map(String::from);
+                        }
                     }
                 }
                 _ => {}
