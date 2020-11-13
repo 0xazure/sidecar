@@ -1,6 +1,6 @@
 use counter::{Counter, TagCount};
 use std::error;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
@@ -73,7 +73,6 @@ pub struct Post {
     id: String,
     extension: Option<String>,
     tags: Vec<String>,
-    image_count: u8,
 }
 
 pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
@@ -103,58 +102,47 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
 }
 
 fn write_sidecar_files<P: AsRef<Path>>(posts: &[Post], media_dir: P) -> Result<(), io::Error> {
+    // Build a sorted cache of media files on disk to more efficiently generate
+    // sidecar files for all files related to a given post instead of relying
+    // solely on the photoset data in `posts.xml` to determine suffixes for
+    // files in multi-photo posts. Relying only on `posts.xml` leaves out any
+    // files added to reblogs of the original post which are also included in
+    // the export and should also generate a sidecar file.
+    //
+    // Note that we do not sort this cache as (based on preliminary testing)
+    // later calls to `filter()` to search the cache for files with specific
+    // prefixes cannot take advantage of sorting. If we get more clever about
+    // cache searching this may change.
+    let files: Vec<fs::DirEntry> = fs::read_dir(&media_dir)?
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_file() && e.path().extension().map_or(true, |ext| ext != "txt"))
+        .collect();
+
     for post in posts {
-        let mut path = PathBuf::new();
-        path.push(media_dir.as_ref());
-
-        let mut buff = Vec::with_capacity(post.tags.iter().fold(0, |a, t| a + t.len() + 1));
+        let mut tags = Vec::with_capacity(post.tags.iter().fold(0, |a, t| a + t.len() + 1));
         for tag in &post.tags {
-            writeln!(&mut buff, "{}", tag)?;
+            writeln!(&mut tags, "{}", tag)?;
         }
 
-        if post.image_count > 0 {
-            for i in 0..post.image_count {
-                write_sidecar_file(
-                    path.clone(),
-                    post.id.clone(),
-                    Some(i),
-                    post.extension.as_ref().unwrap(),
-                    &buff,
-                )?;
+        for entry in files
+            .iter()
+            .filter(|e| {
+                e.path()
+                    .file_stem()
+                    .map_or(false, |f| f.to_string_lossy().starts_with(&post.id))
+            })
+            .collect::<Vec<&fs::DirEntry>>()
+        {
+            let path = entry.path();
+            // Only write sidecar files for source files that actually exist,
+            // since the initial file cache can get out of sync.
+            if entry.path().exists() {
+                let file_path = path.to_string_lossy() + ".txt";
+                let mut tags_file = File::create(file_path.as_ref())?;
+                tags_file.write_all(&tags)?;
             }
-        } else {
-            write_sidecar_file(
-                path.clone(),
-                post.id.clone(),
-                None,
-                post.extension.as_ref().unwrap(),
-                &buff,
-            )?;
         }
     }
-
-    Ok(())
-}
-
-fn write_sidecar_file<E: AsRef<str>>(
-    output_dir: PathBuf,
-    image_id: String,
-    image_offset: Option<u8>,
-    extension: E,
-    tags: &[u8],
-) -> Result<(), io::Error> {
-    let mut file_path = output_dir;
-    let mut filename = image_id;
-
-    if image_offset.is_some() {
-        filename += &format!("_{}", image_offset.unwrap());
-    }
-
-    file_path.push(filename);
-    file_path.set_extension(format!("{}.txt", extension.as_ref()));
-
-    let mut tags_file = File::create(file_path)?;
-    tags_file.write_all(&tags)?;
 
     Ok(())
 }

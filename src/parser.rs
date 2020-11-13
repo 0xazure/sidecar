@@ -8,7 +8,6 @@ use xml::reader::{EventReader, XmlEvent};
 enum XmlTag {
     Post,
     Tag,
-    Photo,
     PhotoUrl,
     Other,
 }
@@ -44,10 +43,6 @@ pub fn parse_posts<P: AsRef<Path>>(posts_file: P) -> Result<Vec<Post>, xml::read
                 }
                 "tag" => last_opened_tag = XmlTag::Tag,
                 "photo-url" => last_opened_tag = XmlTag::PhotoUrl,
-                "photo" => {
-                    last_opened_tag = XmlTag::Photo;
-                    post.image_count += 1;
-                }
                 _ => last_opened_tag = XmlTag::Other,
             },
             Ok(XmlEvent::EndElement { name, .. }) => {
