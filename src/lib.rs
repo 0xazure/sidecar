@@ -23,7 +23,7 @@ pub enum Config {
             default_value = "posts.xml"
         )]
         posts_file: PathBuf,
-        #[structopt(name = "media/", short = "m", long = "media", default_value = "media/")]
+        #[structopt(name = "media", short = "m", long = "media", default_value = "media")]
         media_dir: PathBuf,
     },
     #[structopt(name = "analyze")]
