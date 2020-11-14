@@ -81,7 +81,7 @@ fn parse_posts(common_opts: CommonOpts) -> Result<Vec<Post>> {
 
     let tag_mappings = match tag_mapping_file {
         Some(f) => load_tag_mappings(f)?,
-        None => HashMap::default(),
+        None => HashMap::new(),
     };
 
     parser::parse_posts(posts_file, &tag_mappings)
@@ -141,7 +141,7 @@ fn load_tag_mappings<P: AsRef<Path>>(mapping_file: P) -> Result<HashMap<String, 
     let file = File::open(&mapping_file)?;
     let file = BufReader::new(file);
 
-    let mut mappings = HashMap::default();
+    let mut mappings = HashMap::new();
 
     for line in file.lines() {
         match line {
