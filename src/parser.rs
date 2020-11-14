@@ -1,5 +1,6 @@
 use crate::Post;
 use anyhow::{bail, Context, Result};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
@@ -13,7 +14,10 @@ enum XmlTag {
     Other,
 }
 
-pub fn parse_posts<P: AsRef<Path>>(posts_file: P) -> Result<Vec<Post>> {
+pub fn parse_posts<P: AsRef<Path>>(
+    posts_file: P,
+    tag_mappings: &HashMap<String, Option<String>>,
+) -> Result<Vec<Post>> {
     let file = File::open(posts_file.as_ref()).context(format!(
         "unable to open posts.xml at {:?}",
         posts_file.as_ref()
@@ -52,7 +56,13 @@ pub fn parse_posts<P: AsRef<Path>>(posts_file: P) -> Result<Vec<Post>> {
                 }
             }
             Ok(XmlEvent::Characters(chars)) => match last_opened_tag {
-                XmlTag::Tag => post.tags.push(chars),
+                XmlTag::Tag => {
+                    if let Some(dest_tag) = tag_mappings.get(&chars) {
+                        dest_tag.as_ref().map(|t| post.tags.push(t.clone()));
+                    } else {
+                        post.tags.push(chars);
+                    }
+                }
                 XmlTag::PhotoUrl => {
                     if post.extension.is_none() {
                         let mut iter = chars.rsplitn(2, '.');

@@ -1,7 +1,8 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use counter::{Counter, TagCount};
+use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::Write;
+use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 
@@ -25,11 +26,15 @@ pub enum Config {
         posts_file: PathBuf,
         #[structopt(name = "media", short = "m", long = "media", default_value = "media")]
         media_dir: PathBuf,
+        #[structopt(name = "tag-mappings", long = "tag-mappings")]
+        tag_mapping_file: Option<PathBuf>,
     },
     #[structopt(name = "analyze")]
     Analyze {
         #[structopt(name = "posts.xml", default_value = "posts.xml")]
         posts_file: PathBuf,
+        #[structopt(name = "tag-mappings", long = "tag-mappings")]
+        tag_mapping_file: Option<PathBuf>,
     },
 }
 
@@ -45,12 +50,26 @@ pub fn run(config: Config) -> Result<()> {
         Config::Generate {
             posts_file,
             media_dir,
+            tag_mapping_file,
         } => {
-            let posts = parser::parse_posts(posts_file)?;
+            let tag_mappings = match tag_mapping_file {
+                Some(f) => load_tag_mappings(f)?,
+                None => HashMap::default(),
+            };
+
+            let posts = parser::parse_posts(posts_file, &tag_mappings)?;
             write_sidecar_files(&posts, media_dir)?;
         }
-        Config::Analyze { posts_file } => {
-            let posts = parser::parse_posts(posts_file)?;
+        Config::Analyze {
+            posts_file,
+            tag_mapping_file,
+        } => {
+            let tag_mappings = match tag_mapping_file {
+                Some(f) => load_tag_mappings(f)?,
+                None => HashMap::default(),
+            };
+
+            let posts = parser::parse_posts(posts_file, &tag_mappings)?;
             let mut tag_counts = count_tags(&posts);
 
             tag_counts.sort();
@@ -112,6 +131,43 @@ fn write_sidecar_files<P: AsRef<Path>>(posts: &[Post], media_dir: P) -> Result<(
     }
 
     Ok(())
+}
+
+fn load_tag_mappings<P: AsRef<Path>>(mapping_file: P) -> Result<HashMap<String, Option<String>>> {
+    let file = File::open(&mapping_file)?;
+    let file = BufReader::new(file);
+
+    let mut mappings = HashMap::default();
+
+    for line in file.lines() {
+        match line {
+            Ok(tag_mappings) => {
+                let parts: Vec<&str> = tag_mappings.split(",").map(|t| t.trim()).collect();
+
+                if parts.len() != 2 {
+                    bail!(
+                        "format error in tags remapping file {:?}",
+                        &mapping_file.as_ref()
+                    );
+                }
+
+                let source_tag = parts.get(0).unwrap_or(&"").to_string();
+                let dest_tag = *parts.get(1).unwrap_or(&"");
+                let dest_tag = if dest_tag.is_empty() {
+                    None
+                } else {
+                    Some(String::from(dest_tag))
+                };
+
+                if !source_tag.is_empty() {
+                    mappings.insert(source_tag, dest_tag);
+                }
+            }
+            Err(e) => return Err(e.into()),
+        }
+    }
+
+    Ok(mappings)
 }
 
 fn count_tags(posts: &[Post]) -> Vec<TagCount<&str>> {
