@@ -1,7 +1,7 @@
+use anyhow::{Context, Result};
 use counter::{Counter, TagCount};
-use std::error;
 use std::fs::{self, File};
-use std::io::{self, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 
@@ -33,41 +33,6 @@ pub enum Config {
     },
 }
 
-impl Config {
-    fn exists(&self) -> Result<(), io::Error> {
-        match self {
-            Config::Generate {
-                posts_file,
-                media_dir,
-            } => {
-                if !posts_file.exists() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::NotFound,
-                        format!("No such file or directory {}", posts_file.display()),
-                    ));
-                }
-
-                if !media_dir.exists() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::NotFound,
-                        format!("No such file or directory {}", media_dir.display()),
-                    ));
-                }
-            }
-            Config::Analyze { posts_file } => {
-                if !posts_file.exists() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::NotFound,
-                        format!("No such file or directory {}", posts_file.display()),
-                    ));
-                }
-            }
-        }
-
-        Ok(())
-    }
-}
-
 #[derive(Debug, Default)]
 pub struct Post {
     id: String,
@@ -75,9 +40,7 @@ pub struct Post {
     tags: Vec<String>,
 }
 
-pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
-    config.exists()?;
-
+pub fn run(config: Config) -> Result<()> {
     match config {
         Config::Generate {
             posts_file,
@@ -101,7 +64,7 @@ pub fn run(config: Config) -> Result<(), Box<dyn error::Error>> {
     Ok(())
 }
 
-fn write_sidecar_files<P: AsRef<Path>>(posts: &[Post], media_dir: P) -> Result<(), io::Error> {
+fn write_sidecar_files<P: AsRef<Path>>(posts: &[Post], media_dir: P) -> Result<()> {
     // Build a sorted cache of media files on disk to more efficiently generate
     // sidecar files for all files related to a given post instead of relying
     // solely on the photoset data in `posts.xml` to determine suffixes for
@@ -113,7 +76,11 @@ fn write_sidecar_files<P: AsRef<Path>>(posts: &[Post], media_dir: P) -> Result<(
     // later calls to `filter()` to search the cache for files with specific
     // prefixes cannot take advantage of sorting. If we get more clever about
     // cache searching this may change.
-    let files: Vec<fs::DirEntry> = fs::read_dir(&media_dir)?
+    let files: Vec<fs::DirEntry> = fs::read_dir(&media_dir)
+        .context(format!(
+            "unable to open media directory {:?}",
+            media_dir.as_ref()
+        ))?
         .filter_map(|e| e.ok())
         .filter(|e| e.path().is_file() && e.path().extension().map_or(true, |ext| ext != "txt"))
         .collect();

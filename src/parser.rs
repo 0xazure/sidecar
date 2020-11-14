@@ -1,6 +1,7 @@
 use crate::Post;
+use anyhow::{bail, Context, Result};
 use std::fs::File;
-use std::io::{self, BufReader};
+use std::io::BufReader;
 use std::path::Path;
 use xml::reader::{EventReader, XmlEvent};
 
@@ -12,8 +13,11 @@ enum XmlTag {
     Other,
 }
 
-pub fn parse_posts<P: AsRef<Path>>(posts_file: P) -> Result<Vec<Post>, xml::reader::Error> {
-    let file = File::open(posts_file.as_ref())?;
+pub fn parse_posts<P: AsRef<Path>>(posts_file: P) -> Result<Vec<Post>> {
+    let file = File::open(posts_file.as_ref()).context(format!(
+        "unable to open posts.xml at {:?}",
+        posts_file.as_ref()
+    ))?;
     let file = BufReader::new(file);
     let parser = EventReader::new(file);
 
@@ -24,7 +28,7 @@ pub fn parse_posts<P: AsRef<Path>>(posts_file: P) -> Result<Vec<Post>, xml::read
 
     for event in parser {
         match event {
-            Err(e) => return Err(e),
+            Err(e) => return Err(e.into()),
             Ok(XmlEvent::StartElement {
                 name, attributes, ..
             }) => match name.local_name.as_str() {
@@ -32,13 +36,7 @@ pub fn parse_posts<P: AsRef<Path>>(posts_file: P) -> Result<Vec<Post>, xml::read
                     last_opened_tag = XmlTag::Post;
                     post.id = match attributes.iter().find(|a| a.name.local_name == "id") {
                         Some(id) => id.value.clone(),
-                        None => {
-                            return Err(io::Error::new(
-                                io::ErrorKind::InvalidData,
-                                "Post missing required attribute 'id'",
-                            )
-                            .into())
-                        }
+                        None => bail!("Post missing required attribute 'id'"),
                     }
                 }
                 "tag" => last_opened_tag = XmlTag::Tag,
