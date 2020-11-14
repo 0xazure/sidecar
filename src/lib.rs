@@ -10,6 +10,19 @@ mod counter;
 mod parser;
 
 #[derive(StructOpt, Debug)]
+pub struct CommonOpts {
+    #[structopt(
+        name = "posts.xml",
+        short = "p",
+        long = "posts",
+        default_value = "posts.xml"
+    )]
+    posts_file: PathBuf,
+    #[structopt(name = "tag-mappings", long = "tag-mappings")]
+    tag_mapping_file: Option<PathBuf>,
+}
+
+#[derive(StructOpt, Debug)]
 #[structopt(
     name = "sidecar",
     about = "Generate sidecar files from Tumblr posts.xml files"
@@ -17,24 +30,15 @@ mod parser;
 pub enum Config {
     #[structopt(name = "generate")]
     Generate {
-        #[structopt(
-            name = "posts.xml",
-            short = "p",
-            long = "posts",
-            default_value = "posts.xml"
-        )]
-        posts_file: PathBuf,
         #[structopt(name = "media", short = "m", long = "media", default_value = "media")]
         media_dir: PathBuf,
-        #[structopt(name = "tag-mappings", long = "tag-mappings")]
-        tag_mapping_file: Option<PathBuf>,
+        #[structopt(flatten)]
+        common_opts: CommonOpts,
     },
     #[structopt(name = "analyze")]
     Analyze {
-        #[structopt(name = "posts.xml", default_value = "posts.xml")]
-        posts_file: PathBuf,
-        #[structopt(name = "tag-mappings", long = "tag-mappings")]
-        tag_mapping_file: Option<PathBuf>,
+        #[structopt(flatten)]
+        common_opts: CommonOpts,
     },
 }
 
@@ -48,28 +52,14 @@ pub struct Post {
 pub fn run(config: Config) -> Result<()> {
     match config {
         Config::Generate {
-            posts_file,
             media_dir,
-            tag_mapping_file,
+            common_opts,
         } => {
-            let tag_mappings = match tag_mapping_file {
-                Some(f) => load_tag_mappings(f)?,
-                None => HashMap::default(),
-            };
-
-            let posts = parser::parse_posts(posts_file, &tag_mappings)?;
+            let posts = parse_posts(common_opts)?;
             write_sidecar_files(&posts, media_dir)?;
         }
-        Config::Analyze {
-            posts_file,
-            tag_mapping_file,
-        } => {
-            let tag_mappings = match tag_mapping_file {
-                Some(f) => load_tag_mappings(f)?,
-                None => HashMap::default(),
-            };
-
-            let posts = parser::parse_posts(posts_file, &tag_mappings)?;
+        Config::Analyze { common_opts } => {
+            let posts = parse_posts(common_opts)?;
             let mut tag_counts = count_tags(&posts);
 
             tag_counts.sort();
@@ -81,6 +71,20 @@ pub fn run(config: Config) -> Result<()> {
     };
 
     Ok(())
+}
+
+fn parse_posts(common_opts: CommonOpts) -> Result<Vec<Post>> {
+    let CommonOpts {
+        posts_file,
+        tag_mapping_file,
+    } = common_opts;
+
+    let tag_mappings = match tag_mapping_file {
+        Some(f) => load_tag_mappings(f)?,
+        None => HashMap::default(),
+    };
+
+    parser::parse_posts(posts_file, &tag_mappings)
 }
 
 fn write_sidecar_files<P: AsRef<Path>>(posts: &[Post], media_dir: P) -> Result<()> {
