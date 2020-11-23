@@ -45,7 +45,6 @@ pub enum Config {
 #[derive(Debug, Default)]
 pub struct Post {
     id: String,
-    extension: Option<String>,
     tags: Vec<String>,
 }
 

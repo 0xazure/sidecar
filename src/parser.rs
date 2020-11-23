@@ -10,7 +10,6 @@ use xml::reader::{EventReader, XmlEvent};
 enum XmlTag {
     Post,
     Tag,
-    PhotoUrl,
     Other,
 }
 
@@ -44,14 +43,11 @@ pub fn parse_posts<P: AsRef<Path>>(
                     }
                 }
                 "tag" => last_opened_tag = XmlTag::Tag,
-                "photo-url" => last_opened_tag = XmlTag::PhotoUrl,
                 _ => last_opened_tag = XmlTag::Other,
             },
             Ok(XmlEvent::EndElement { name, .. }) => {
                 if name.local_name.as_str() == "post" {
-                    if post.extension.is_some() {
-                        posts.push(post);
-                    }
+                    posts.push(post);
                     post = Default::default();
                 }
             }
@@ -61,17 +57,6 @@ pub fn parse_posts<P: AsRef<Path>>(
                         dest_tag.as_ref().map(|t| post.tags.push(t.clone()));
                     } else {
                         post.tags.push(chars);
-                    }
-                }
-                XmlTag::PhotoUrl => {
-                    if post.extension.is_none() {
-                        let mut iter = chars.rsplitn(2, '.');
-                        let after = iter.next();
-                        let before = iter.next();
-
-                        if before.is_some() {
-                            post.extension = after.map(String::from);
-                        }
                     }
                 }
                 _ => {}
