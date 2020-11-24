@@ -32,6 +32,12 @@ pub enum Config {
     Generate {
         #[structopt(name = "media", short = "m", long = "media", default_value = "media")]
         media_dir: PathBuf,
+        #[structopt(
+            name = "report missing media",
+            long = "report-missing-media",
+            help = "Report media posts without corresponding files in the media directory"
+        )]
+        report_missing: bool,
         #[structopt(flatten)]
         common_opts: CommonOpts,
     },
@@ -42,20 +48,47 @@ pub enum Config {
     },
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, PartialEq)]
+pub enum MediaType {
+    Text,
+    Photo,
+    Other,
+}
+
+#[derive(Debug)]
 pub struct Post {
     id: String,
+    url: String,
+    media_type: MediaType,
     tags: Vec<String>,
+}
+
+impl Default for Post {
+    fn default() -> Self {
+        Self {
+            id: "".to_string(),
+            url: "".to_string(),
+            media_type: MediaType::Text,
+            tags: Vec::new(),
+        }
+    }
 }
 
 pub fn run(config: Config) -> Result<()> {
     match config {
         Config::Generate {
             media_dir,
+            report_missing,
             common_opts,
         } => {
+            let file_cache = build_file_cache(&media_dir)?;
             let posts = parse_posts(common_opts)?;
-            write_sidecar_files(&posts, media_dir)?;
+
+            write_sidecar_files(&posts, &file_cache)?;
+
+            if report_missing {
+                report_missing_media(&posts, &file_cache);
+            }
         }
         Config::Analyze { common_opts } => {
             let posts = parse_posts(common_opts)?;
@@ -86,34 +119,14 @@ fn parse_posts(common_opts: CommonOpts) -> Result<Vec<Post>> {
     parser::parse_posts(posts_file, &tag_mappings)
 }
 
-fn write_sidecar_files<P: AsRef<Path>>(posts: &[Post], media_dir: P) -> Result<()> {
-    // Build a sorted cache of media files on disk to more efficiently generate
-    // sidecar files for all files related to a given post instead of relying
-    // solely on the photoset data in `posts.xml` to determine suffixes for
-    // files in multi-photo posts. Relying only on `posts.xml` leaves out any
-    // files added to reblogs of the original post which are also included in
-    // the export and should also generate a sidecar file.
-    //
-    // Note that we do not sort this cache as (based on preliminary testing)
-    // later calls to `filter()` to search the cache for files with specific
-    // prefixes cannot take advantage of sorting. If we get more clever about
-    // cache searching this may change.
-    let files: Vec<fs::DirEntry> = fs::read_dir(&media_dir)
-        .context(format!(
-            "unable to open media directory {}",
-            media_dir.as_ref().display()
-        ))?
-        .filter_map(|e| e.ok())
-        .filter(|e| e.path().is_file() && e.path().extension().map_or(true, |ext| ext != "txt"))
-        .collect();
-
+fn write_sidecar_files(posts: &[Post], file_cache: &[fs::DirEntry]) -> Result<()> {
     for post in posts {
         let mut tags = Vec::with_capacity(post.tags.iter().fold(0, |a, t| a + t.len() + 1));
         for tag in &post.tags {
             writeln!(&mut tags, "{}", tag)?;
         }
 
-        for entry in files
+        for entry in file_cache
             .iter()
             .filter(|e| {
                 e.path()
@@ -171,6 +184,49 @@ fn load_tag_mappings<P: AsRef<Path>>(mapping_file: P) -> Result<HashMap<String, 
     }
 
     Ok(mappings)
+}
+
+fn build_file_cache<P: AsRef<Path>>(media_dir: P) -> Result<Vec<fs::DirEntry>> {
+    // Build a sorted cache of media files on disk to more efficiently generate
+    // sidecar files for all files related to a given post instead of relying
+    // solely on the photoset data in `posts.xml` to determine suffixes for
+    // files in multi-photo posts. Relying only on `posts.xml` leaves out any
+    // files added to reblogs of the original post which are also included in
+    // the export and should also generate a sidecar file.
+    //
+    // Note that we do not sort this cache as (based on preliminary testing)
+    // later calls to `filter()` to search the cache for files with specific
+    // prefixes cannot take advantage of sorting. If we get more clever about
+    // cache searching this may change.
+    let files: Vec<fs::DirEntry> = fs::read_dir(&media_dir)
+        .context(format!(
+            "unable to open media directory {}",
+            media_dir.as_ref().display()
+        ))?
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_file() && e.path().extension().map_or(true, |ext| ext != "txt"))
+        .collect();
+
+    Ok(files)
+}
+
+fn report_missing_media(posts: &[Post], files: &[fs::DirEntry]) {
+    for post in posts {
+        let mut found = false;
+        for entry in files {
+            if entry.file_name().to_string_lossy().starts_with(&post.id) {
+                found = true;
+                break;
+            }
+        }
+
+        if found == false && post.media_type == MediaType::Photo {
+            println!(
+                "No media file(s) found for post ID {}, download them manually from {}",
+                post.id, post.url
+            );
+        }
+    }
 }
 
 fn count_tags(posts: &[Post]) -> Vec<TagCount<&str>> {

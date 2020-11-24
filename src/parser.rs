@@ -1,4 +1,4 @@
-use crate::Post;
+use crate::{MediaType, Post};
 use anyhow::{bail, Context, Result};
 use std::collections::HashMap;
 use std::fs::File;
@@ -40,7 +40,22 @@ pub fn parse_posts<P: AsRef<Path>>(
                     post.id = match attributes.iter().find(|a| a.name.local_name == "id") {
                         Some(id) => id.value.clone(),
                         None => bail!("Post missing required attribute 'id'"),
-                    }
+                    };
+
+                    post.url = match attributes.iter().find(|a| a.name.local_name == "url") {
+                        Some(url) => url.value.clone(),
+                        None => bail!("Post missing required attribute 'url'"),
+                    };
+
+                    post.media_type = match attributes.iter().find(|a| a.name.local_name == "type")
+                    {
+                        Some(t) => match t.value.as_ref() {
+                            "regular" => MediaType::Text,
+                            "photo" => MediaType::Photo,
+                            _ => MediaType::Other,
+                        },
+                        None => bail!("Post missing required attribute 'type'"),
+                    };
                 }
                 "tag" => last_opened_tag = XmlTag::Tag,
                 _ => last_opened_tag = XmlTag::Other,
