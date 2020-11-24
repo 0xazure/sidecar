@@ -100,8 +100,8 @@ fn write_sidecar_files<P: AsRef<Path>>(posts: &[Post], media_dir: P) -> Result<(
     // cache searching this may change.
     let files: Vec<fs::DirEntry> = fs::read_dir(&media_dir)
         .context(format!(
-            "unable to open media directory {:?}",
-            media_dir.as_ref()
+            "unable to open media directory {}",
+            media_dir.as_ref().display()
         ))?
         .filter_map(|e| e.ok())
         .filter(|e| e.path().is_file() && e.path().extension().map_or(true, |ext| ext != "txt"))
@@ -149,8 +149,8 @@ fn load_tag_mappings<P: AsRef<Path>>(mapping_file: P) -> Result<HashMap<String, 
 
                 if parts.len() != 2 {
                     bail!(
-                        "format error in tags remapping file {:?}",
-                        &mapping_file.as_ref()
+                        "format error in tags remapping file {}",
+                        &mapping_file.as_ref().display()
                     );
                 }
 

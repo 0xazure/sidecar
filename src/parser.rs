@@ -18,8 +18,8 @@ pub fn parse_posts<P: AsRef<Path>>(
     tag_mappings: &HashMap<String, Option<String>>,
 ) -> Result<Vec<Post>> {
     let file = File::open(posts_file.as_ref()).context(format!(
-        "unable to open posts.xml at {:?}",
-        posts_file.as_ref()
+        "unable to open posts.xml at {}",
+        posts_file.as_ref().display()
     ))?;
     let file = BufReader::new(file);
     let parser = EventReader::new(file);
